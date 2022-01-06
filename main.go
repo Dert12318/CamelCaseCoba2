@@ -23,7 +23,7 @@ type Name2 struct {
 }
 type Person struct {
 	Name     Name   `json:"Nameku"`
-	FullName string `json:"FullName"`
+	FullName Name   `json:"FullName"`
 	Ages     string `json:"Ages"`
 }
 type Person2 struct {
@@ -77,14 +77,16 @@ func coba(data interface{}, model interface{}) error {
 				break
 			}
 		}
+
 		if !boolku {
 			return errors.New(key.String())
 		} else if strings.Contains(res, "map[") {
 			fmt.Println("masuk sini satu")
-			return coba(dataMap[key.String()], strct.Interface())
+			err := coba(dataMap[key.String()], modelMap[key.String()])
+			if err != nil {
+				return err
+			}
 		}
-		fmt.Println("end of lop 1")
 	}
-
 	return nil
 }
