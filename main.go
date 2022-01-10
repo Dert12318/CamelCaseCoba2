@@ -24,7 +24,7 @@ type Name2 struct {
 type Person struct {
 	Name     Name   `json:"Nameku"`
 	FullName Name   `json:"FullName"`
-	Ages     string `json:"Ages"`
+	Ages     string `json:"Ages,omitempty"`
 }
 type Person2 struct {
 	Name     Name2  `json:"Nameku"`
@@ -35,54 +35,80 @@ type Person2 struct {
 func main() {
 	r := gin.Default()
 	r.POST("/ping", func(c *gin.Context) {
-		dataku, errlala := ioutil.ReadAll(c.Request.Body)
-		var req2 map[string]interface{}
-		fmt.Println(errlala)
-		finalData := string(dataku)
-		errJson := json.Unmarshal([]byte(string(finalData)), &req2)
-		fmt.Println(errJson)
-		err := coba(req2, Person{})
-		fmt.Println(err, "error guys")
-		c.JSON(200, err.Error())
+		data, err := ShouldBindJsonWithCamelCase(c, Person{})
+		if err != nil {
+			c.JSON(400, "error")
+			fmt.Println("error gys", err)
+			return
+		}
+		fmt.Println(data, "ini data guys")
+		c.JSON(200, "Masuk Gan")
 	})
 	r.Run()
 
 }
 
-func coba(data interface{}, model interface{}) error {
-	var modelMap map[string]interface{}
-	var dataMap map[string]interface{}
-	boolku := true
+// type errorKu struct {
+// }
+
+func ShouldBindJsonWithCamelCase(c *gin.Context, model interface{}) (interface{}, error) {
+	//Declare Local Variable
+	var dataMap map[string]interface{} // for mapping data
+
+	//Get data from web
+	data, errReadGin := ioutil.ReadAll(c.Request.Body)
+	if errReadGin != nil {
+		fmt.Println("1")
+		return nil, errReadGin
+	}
+	// Marshaling to MapString
+	errUnmarshalDataToMap := json.Unmarshal([]byte(string(data)), &dataMap)
+	if errUnmarshalDataToMap != nil {
+		fmt.Println("2")
+		return nil, errUnmarshalDataToMap
+	}
+	errCamelCase := CamelCaseChecker(dataMap, model)
+	if errCamelCase != nil {
+		fmt.Println("3")
+		return nil, errCamelCase
+	}
+	return nil, nil
+
+}
+func CamelCaseChecker(data interface{}, model interface{}) error {
+	var tempData map[string]interface{}
 	jsonModel, _ := json.Marshal(model)
-	json.Unmarshal(jsonModel, &modelMap)
-	fmt.Println("Model Map :", modelMap)
-	jsonModelMap, _ := json.Marshal(data)
-	json.Unmarshal(jsonModelMap, &dataMap)
-	fmt.Println("Data Map :", dataMap)
-	dt := reflect.ValueOf(modelMap)
-	dt2 := reflect.ValueOf(data)
-	for _, key := range dt.MapKeys() {
-		strct := dt.MapIndex(key)
-		res := fmt.Sprintf("%s", strct.Interface())
+	json.Unmarshal(jsonModel, &tempData)
+	boolku := true
+	fmt.Println("Model Map :", model)
+	fmt.Println("Data Map :", tempData)
+	rt := reflect.TypeOf(model)
+	dt2 := reflect.ValueOf(tempData)
+	for i := 0; i < rt.NumField(); i++ {
+		f := rt.Field(i)
+		v := strings.Split(f.Tag.Get("json"), ",")[0] // use split to ignore tag "options"
 		for _, key2 := range dt2.MapKeys() {
 			strct2 := dt2.MapIndex(key2)
 			res2 := fmt.Sprintf("%s", strct2.Interface())
-			fmt.Println(res, res2, "lop")
-			if key.String() != key2.String() {
-				fmt.Println(key.String(), key2.String())
+			fmt.Println(f, res2, "lop")
+			if v != key2.String() {
+				fmt.Println("gak cocok")
 				boolku = false
-			} else if key.String() == key2.String() {
+			} else if v == key2.String() {
+				fmt.Println("cocok")
 				boolku = true
-				fmt.Println("masuk sini guys")
 				break
 			}
 		}
-
 		if !boolku {
-			return errors.New(key.String())
-		} else if strings.Contains(res, "map[") {
-			fmt.Println("masuk sini satu")
-			err := coba(dataMap[key.String()], modelMap[key.String()])
+			isOmitEmpty := strings.Contains(f.Tag.Get("json"), "omitempty")
+			if !isOmitEmpty {
+				return errors.New(v)
+			}
+		} else if strings.Contains(f.Type.String(), ".") {
+			fmt.Println(tempData[v], Name{}, "rekursif")
+			err := CamelCaseChecker(tempData[v], Name{})
+			fmt.Println(err, "errKUalat")
 			if err != nil {
 				return err
 			}
